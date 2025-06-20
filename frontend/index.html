@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoteTaker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .note-card {
+            transition: all 0.2s;
+        }
+        .note-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-6">
+    <div class="max-w-3xl mx-auto">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-indigo-600">NoteTaker</h1>
+        </header>
+
+        <!-- Note Form -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4" id="form-title">Create New Note</h2>
+            <form id="note-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Title</label>
+                    <input type="text" id="title" class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Content</label>
+                    <textarea id="content" rows="4" class="w-full p-2 border rounded"></textarea>
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                        Save Note
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Notes List -->
+        <div>
+            <h2 class="text-xl font-semibold mb-4">Your Notes</h2>
+            <div id="notes-list" class="grid gap-4">
+                <!-- Notes will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const API_URL = 'http://localhost:3000/notes';
+    let editingNoteId = null;
+
+    // Load notes when page loads
+    document.addEventListener('DOMContentLoaded', loadNotes);
+
+    // Form submission
+    document.getElementById('note-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const title = document.getElementById('title').value;
+        const content = document.getElementById('content').value;
+
+        try {
+            if (editingNoteId) {
+                // Update existing note
+                await fetch(`${API_URL}/${editingNoteId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, content })
+                });
+            } else {
+                // Create new note
+                await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, content })
+                });
+            }
+            
+            // Reset form and reload notes
+            resetForm();
+            await loadNotes(); // Wait for notes to reload
+            
+        } catch (error) {
+            console.error("Error:", error);
+        }
+    });
+
+    // Load all notes
+    async function loadNotes() {
+        try {
+            const response = await fetch(API_URL);
+            const notes = await response.json();
+            renderNotes(notes);
+        } catch (error) {
+            console.error("Failed to load notes:", error);
+        }
+    }
+
+    // Display notes
+    function renderNotes(notes) {
+        const notesList = document.getElementById('notes-list');
+        notesList.innerHTML = '';
+        
+        notes.forEach(note => {
+            notesList.innerHTML += `
+                <div class="note-card bg-white p-4 rounded-lg shadow mb-4">
+                    <h3 class="text-lg font-bold">${note.title}</h3>
+                    <p class="my-2 text-gray-600">${note.content}</p>
+                    <div class="flex justify-end space-x-2 mt-3">
+                        <button onclick="startEdit('${note._id}', '${escapeQuotes(note.title)}', '${escapeQuotes(note.content)}')" 
+                                class="edit-btn px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">
+                            Edit
+                        </button>
+                        <button onclick="deleteNote('${note._id}')" 
+                                class="delete-btn px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    // Helper to escape quotes in content
+    function escapeQuotes(str) {
+        return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+
+    // Edit a note
+    function startEdit(id, title, content) {
+        document.getElementById('title').value = title;
+        document.getElementById('content').value = content;
+        editingNoteId = id;
+        document.getElementById('form-submit-btn').textContent = 'Update Note';
+        document.getElementById('title').focus();
+    }
+
+    // Delete a note
+    async function deleteNote(id) {
+        if (confirm('Delete this note permanently?')) {
+            try {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                await loadNotes(); // Wait for notes to reload
+            } catch (error) {
+                console.error("Failed to delete note:", error);
+            }
+        }
+    }
+
+    // Reset form
+    function resetForm() {
+        document.getElementById('note-form').reset();
+        editingNoteId = null;
+        document.getElementById('form-submit-btn').textContent = 'Save Note';
+    }
+</script>
+
+</body>
+</html>
